@@ -17,10 +17,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,65 +36,75 @@ public class ActTest {
     @Autowired
     private RestTemplate restTemplate;
 
-    private ThreadPoolExecutor threadPool;
+    private ScheduledThreadPoolExecutor threadPool;
 
     @Before
     public void setup() {
-        threadPool = new ThreadPoolExecutor(
+        threadPool = new ScheduledThreadPoolExecutor(1);
+        /*threadPool = new ThreadPoolExecutor(
                 1, 16, 0, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>());
+                new ArrayBlockingQueue<Runnable>(1000));*/
     }
 
     @Test
     public void testSendValidateCode() throws InterruptedException {
         List<String> phoneNums = generatePhoneNums();
 
-        CountDownLatch doneSignal = new CountDownLatch(phoneNums.size());
-        phoneNums.forEach(p -> {
+        CountDownLatch doneSignal = new CountDownLatch(1);
+
+        threadPool.scheduleAtFixedRate(new SendValidateTask(phoneNums, doneSignal), 2, 2, TimeUnit.SECONDS);
+        /*phoneNums.forEach(p -> {
             threadPool.execute(new SendValidateTask(p,doneSignal));
-        });
+        });*/
 
         doneSignal.await();
     }
 
     private class SendValidateTask implements Runnable {
 
-        private String phoneNum;
+        private LinkedList<String> phoneNums;
         private CountDownLatch doneSignal;
 
-        public SendValidateTask(String phoneNum, CountDownLatch doneSignal) {
-            this.phoneNum = phoneNum;
+        public SendValidateTask(List<String> phoneNums, CountDownLatch doneSignal) {
+            this.phoneNums = new LinkedList<>(phoneNums);
             this.doneSignal = doneSignal;
         }
 
         @Override
         public void run() {
+            if (phoneNums.size() <= 0) {
+                doneSignal.countDown();
+                return;
+            }
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
             MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-            map.add("mobile", phoneNum);
+            String phone = phoneNums.removeFirst();
+            System.out.println("发送短信到" + phone);
+            map.add("mobile", phone);
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
 
-            GreenPowerResponse greenPowerResponse = restTemplate.postForObject("http://91greenpower.com/sendShortMsg", request, GreenPowerResponse.class);
-            System.out.println(JSON.toJSONString(greenPowerResponse));
-
-            doneSignal.countDown();
+            try {
+                GreenPowerResponse greenPowerResponse = restTemplate.postForObject("http://91greenpower.com/sendShortMsg", request, GreenPowerResponse.class);
+                System.out.println(JSON.toJSONString(greenPowerResponse));
+            }catch (Exception e){
+                System.out.println("发送失败...");
+            }
         }
     }
 
     private List<String> generatePhoneNums(){
         List<String> list = new ArrayList<>();
-        long startNum = 17751509862l;
-        for(int i = 0;i < 10;i++) {
-            list.add(String.valueOf(startNum++));
+        long startNum = 17761374970l;
+        for(int i = 0;i < 1000;i++) {
+            list.add(String.valueOf(startNum + 2 * i));
         }
         return list;
     }
 
     @After
-
     public void shutdown() {
         threadPool.shutdown();
     }

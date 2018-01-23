@@ -20,6 +20,7 @@ public class DdosApplication {
 		httpRequestFactory.setConnectTimeout(2000);
 
 		SocketAddress address = new InetSocketAddress("118.193.26.18", 8080);
+//		SocketAddress address = new InetSocketAddress("103.15.187.110", 81);
 		Proxy proxy = new Proxy(Proxy.Type.HTTP, address);
 		httpRequestFactory.setProxy(proxy);
 
