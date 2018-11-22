@@ -29,7 +29,8 @@ public class DdosApplication {
 
 	@Bean
 	public RestTemplate restTemplate(SimpleClientHttpRequestFactory httpClientFactory) {
-		RestTemplate restTemplate = new RestTemplate(httpClientFactory);
+		RestTemplate restTemplate = new RestTemplate();
+//		RestTemplate restTemplate = new RestTemplate(httpClientFactory);
 		return restTemplate;
 	}
 
